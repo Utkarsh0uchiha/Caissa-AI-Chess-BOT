@@ -29,6 +29,57 @@ class GameState:
             self.board[move.endRow][move.endCol] = move.pieceCaptured
             self.whiteToMove = not self.whiteToMove  # switch turn back
 
+    # All the moves considering checks
+    def getValidMoves(self):
+        return self.getAllPossibleMoves()
+
+    # ALl the moves without considering checks
+    def getAllPossibleMoves(self):
+        moves = [Move((6, 4), (4, 4), self.board)]
+        for r in range(len(self.board)):
+            for c in range(len(self.board[r])):
+                turn = self.board[r][c][0]
+                if (turn == 'W' and self.whiteToMove) and (turn == 'B' and not self.whiteToMove):
+                    piece = self.board[r][c][1]
+                    if piece == 'p':
+                        self.getPawnMoves(r, c, moves)
+                    elif piece == 'r':
+                        self.getRookMoves(r, c, moves)
+                    elif piece == 'b':
+                        self.getBishopMoves(r, c, moves)
+                    elif piece == 'n':
+                        self.getKnightMoves(r, c, moves)
+                    elif piece == 'k':
+                        self.getKingMoves(r, c, moves)
+                    else:
+                        self.getQueenMoves(r, c, moves)
+        return moves
+
+    # get all the pawn moves located at row and col and add these moves to the list
+
+    def getPawnMoves(self, r, c, moves):
+        pass
+    # get all the rook moves located at row and col and add these moves to the list
+
+    def getRookMoves(self, r, c, moves):
+        pass
+    # get all the  bishop moves located at row and col and add these moves to the list
+
+    def getBishopMoves(self, r, c, moves):
+        pass
+    # get all the knight moves located at row and col and add these moves to the list
+
+    def getKnightMoves(self, r, c, moves):
+        pass
+    # get all the king moves located at row and col and add these moves to the list
+
+    def getKingMoves(self, r, c, moves):
+        pass
+    # get all the queen moves located at row and col and add these moves to the list
+
+    def getQueenMoves(self, r, c, moves):
+        pass
+
 
 class Move():
     # maps keys to values
@@ -47,7 +98,14 @@ class Move():
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
+        self.moveId = self.startRow * 1000 + self.startCol * \
+            100 + self.endRow * 10 + self.endCol
+    # overwritting the equals method
 
+    def __eq__(self, other):
+        if isinstance(other, Move):
+            return self.moveId == other.moveId
+        return False
     def getChessNotation(self):
         # chess notations like 'e2e4', 'e7e5' etc.
         return self.getRankFile(self.startRow, self.startCol) + self.getRankFile(self.endRow, self.endCol)

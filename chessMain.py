@@ -2,6 +2,11 @@ import pygame as p  # type: ignore
 import chessEngine
 
 p.init()
+p.display.set_caption("Caïssa Chess")  # Change window title
+# Example: using the white king as the icon
+icon = p.image.load("logo.png")
+p.display.set_icon(icon)
+
 WIDTH = HEIGHT = 512
 
 DIMENSION = 8
@@ -28,6 +33,8 @@ def main():
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
     gs = chessEngine.GameState()
+    validMoves = gs.getValidMoves()
+    moveMade = False  # flag var for when a move is made
     loadImages()  # only do this once, before the while loop
     running = True
     sqSelected = ()  # no square seleceted rn
@@ -53,12 +60,19 @@ def main():
                     move = chessEngine.Move(
                         playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    gs.makeMove(move)
+                    if move in validMoves:
+                        gs.makeMove(move)
+                        moveMade = True
                     sqSelected = ()  # reset user clicks
                     playerClicks = []
             # key handlers
             elif e.type == p.KEYDOWN and e.key == p.K_z:  # undo when 'z' is pressed
                 gs.undoMove()
+                moveMade = True
+
+        if moveMade:
+            validMoves = gs.getValidMoves()
+            moveMade = False
 
         drawGameState(screen, gs)  # Call this function to draw the board
         clock.tick(MAX_FPS)
