@@ -14,7 +14,7 @@ class GameState:
         self.MoveFunc = {'p':
                          self.getPawnMoves, 'r':
                          self.getRookMoves, 'b':
-                         self.getBishopMoves, 'n': 
+                         self.getBishopMoves, 'n':
                          self.getKnightMoves, 'k':
                          self.getKingMoves, 'q': self.getQueenMoves}
         self.whiteToMove = True
@@ -82,7 +82,7 @@ class GameState:
     # get all the rook moves located at row and col and add these moves to the list
 
     def getRookMoves(self, r, c, moves):
-        # Up, Down, Left, Right
+        # Moves only in a straight file Up, Down, Left, Right
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
         enemyColor = 'B' if self.whiteToMove else 'W'
@@ -109,19 +109,110 @@ class GameState:
     # get all the  bishop moves located at row and col and add these moves to the list
 
     def getBishopMoves(self, r, c, moves):
-        pass
+        # moves anywhere diagonally
+        directions = [(-1, 1), (1, 1), (1, -1), (-1, -1)]
+
+        enemyColor = 'B' if self.whiteToMove else 'W'
+
+        for d in directions:
+            for i in range(1, 8):  # Maximum move length is 7 squares
+                endRow = r + d[0] * i
+                endCol = c + d[1] * i
+
+                if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure within bounds
+                    endPiece = self.board[endRow][endCol]
+                    if endPiece == "--":  # Empty square, valid move
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                    elif endPiece[0] == enemyColor:  # Enemy piece, valid capture
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                        break  # Stop after capturing
+                    else:  # Friendly piece, stop
+                        break
+                else:  # Out of bounds
+                    break
     # get all the knight moves located at row and col and add these moves to the list
 
     def getKnightMoves(self, r, c, moves):
-        pass
+        # move 2 and a half squares
+        directions = [(1, 2), (-1, 2), (1, -2), (-1, -2),
+                      (2, 1), (-2, 1), (2, -1), (-2, -1)]
+
+        enemyColor = 'B' if self.whiteToMove else 'W'
+
+        for d in directions:
+            for i in range(1, 8):  # Maximum move length is 7 squares
+                endRow = r + d[0] * i
+                endCol = c + d[1] * i
+
+                if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure within bounds
+                    endPiece = self.board[endRow][endCol]
+                    if endPiece == "--":  # Empty square, valid move
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                    elif endPiece[0] == enemyColor:  # Enemy piece, valid capture
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                        break  # Stop after capturing
+                    else:  # Friendly piece, stop
+                        break
+                else:  # Out of bounds
+                    break
     # get all the king moves located at row and col and add these moves to the list
 
     def getKingMoves(self, r, c, moves):
-        pass
+        # moves anywhere but only one square
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1),
+                      (-1, 1), (1, 1), (1, -1), (-1, -1)]
+
+        enemyColor = 'B' if self.whiteToMove else 'W'
+
+        for d in directions:
+            for i in range(1, 2):  # Maximum move length is 7 squares
+                endRow = r + d[0] * i
+                endCol = c + d[1] * i
+
+                if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure within bounds
+                    endPiece = self.board[endRow][endCol]
+                    if endPiece == "--":  # Empty square, valid move
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                    elif endPiece[0] == enemyColor:  # Enemy piece, valid capture
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                        break  # Stop after capturing
+                    else:  # Friendly piece, stop
+                        break
+                else:  # Out of bounds
+                    break
     # get all the queen moves located at row and col and add these moves to the list
 
     def getQueenMoves(self, r, c, moves):
-        pass
+        # goat piece: can move anywhere on the board
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1),
+                      (-1, 1), (1, 1), (1, -1), (-1, -1)]
+
+        enemyColor = 'B' if self.whiteToMove else 'W'
+
+        for d in directions:
+            for i in range(1, 8):  # Maximum move length is 7 squares
+                endRow = r + d[0] * i
+                endCol = c + d[1] * i
+
+                if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure within bounds
+                    endPiece = self.board[endRow][endCol]
+                    if endPiece == "--":  # Empty square, valid move
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                    elif endPiece[0] == enemyColor:  # Enemy piece, valid capture
+                        moves.append(
+                            Move((r, c), (endRow, endCol), self.board))
+                        break  # Stop after capturing
+                    else:  # Friendly piece, stop
+                        break
+                else:  # Out of bounds
+                    break
 
 
 class Move():
