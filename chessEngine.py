@@ -19,6 +19,10 @@ class GameState:
                          self.getKingMoves, 'q': self.getQueenMoves}
         self.whiteToMove = True
         self.moveLog = []
+        self.WhiteKingLocation = (7, 4)
+        self.BlackKingLocation = (0, 4)
+        self.checkmate = False
+        self.stalemate = False
 
     # takes a move asa parameter and executes it (it won't work for pawn promotion and en-passant or castling)
     def makeMove(self, move):
@@ -26,20 +30,72 @@ class GameState:
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move)  # log the move so we can undo it later
         self.whiteToMove = not self.whiteToMove  # black turn
-
+        # if white king moved
+        if move.pieceMoved == 'Wk':
+            self.WhiteKingLocation = (move.endRow, move.endCol)
+        # if black king moved
+        elif move.pieceMoved == 'Bk':
+            self.BlackKingLocation = (move.endRow, move.endCol)
     # undo the last move made
+
     def undoMove(self):
         if len(self.moveLog) != 0:  # make sure there is a move to undo
             move = self.moveLog.pop()
             self.board[move.startRow][move.startCol] = move.pieceMoved
             self.board[move.endRow][move.endCol] = move.pieceCaptured
             self.whiteToMove = not self.whiteToMove  # switch turn back
-
+            # if white king moved
+            if move.pieceMoved == 'Wk':
+                self.WhiteKingLocation = (move.startRow, move.startCol)
+            # if black king moved
+            elif move.pieceMoved == 'Bk':
+                self.BlackKingLocation = (move.startRow, move.startCol)
     # All the moves considering checks
+
     def getValidMoves(self):
-        return self.getAllPossibleMoves()
+        moves = self.getAllPossibleMoves()
+        for i in range(len(moves)-1, -1, -1):
+            self.makeMove(moves[i])
+            self.whiteToMove = not self.whiteToMove
+            if self.inCheck():
+                moves.remove(moves[i])
+            self.whiteToMove = not self.whiteToMove
+            self.undoMove()
+        if len(moves) == 0:
+            if self.inCheck():
+                self.checkmate = True
+                if self.whiteToMove:
+                    print("BLACK WON!!!")
+                else:
+                    print("WHITE WON!!!")
+            else:
+                self.stalemate = True
+                print("STALEMATE, DRAW!!!")
+        else:
+            self.checkmate = False
+            self.stalemate = False
+
+        return moves
+    # checks weather the king is in check
+
+    def inCheck(self):
+        if self.whiteToMove:
+            return self.isSquareAttacked(self.WhiteKingLocation[0], self.WhiteKingLocation[1])
+        else:
+            return self.isSquareAttacked(self.BlackKingLocation[0], self.BlackKingLocation[1])
+
+    # checks is the square is being attacked or not
+    def isSquareAttacked(self, r, c):
+        self.whiteToMove = not self.whiteToMove
+        oppomoves = self.getAllPossibleMoves()
+        self.whiteToMove = not self.whiteToMove
+        for moves in oppomoves:
+            if moves.endRow == r and moves.endCol == c:
+                return True
+        return False
 
     # ALl the moves without considering checks
+
     def getAllPossibleMoves(self):
         moves = []
         for r in range(len(self.board)):
@@ -136,29 +192,24 @@ class GameState:
 
     def getKnightMoves(self, r, c, moves):
         # move 2 and a half squares
-        directions = [(1, 2), (-1, 2), (1, -2), (-1, -2),
-                      (2, 1), (-2, 1), (2, -1), (-2, -1)]
 
-        enemyColor = 'B' if self.whiteToMove else 'W'
+        # Possible knight moves (L-shaped jumps)
+        knightMoves = [
+            (2, 1), (2, -1), (-2, 1), (-2, -1),
+            (1, 2), (1, -2), (-1, 2), (-1, -2)
+        ]
 
-        for d in directions:
-            for i in range(1, 8):  # Maximum move length is 7 squares
-                endRow = r + d[0] * i
-                endCol = c + d[1] * i
+        allyColor = 'W' if self.whiteToMove else 'B'
 
-                if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure within bounds
-                    endPiece = self.board[endRow][endCol]
-                    if endPiece == "--":  # Empty square, valid move
-                        moves.append(
-                            Move((r, c), (endRow, endCol), self.board))
-                    elif endPiece[0] == enemyColor:  # Enemy piece, valid capture
-                        moves.append(
-                            Move((r, c), (endRow, endCol), self.board))
-                        break  # Stop after capturing
-                    else:  # Friendly piece, stop
-                        break
-                else:  # Out of bounds
-                    break
+        for d in knightMoves:
+            endRow, endCol = r + d[0], c + d[1]
+
+            if 0 <= endRow < 8 and 0 <= endCol < 8:  # Ensure move is within bounds
+                endPiece = self.board[endRow][endCol]
+                # Empty or enemy piece
+                if endPiece == "--" or endPiece[0] != allyColor:
+                    moves.append(Move((r, c), (endRow, endCol), self.board))
+
     # get all the king moves located at row and col and add these moves to the list
 
     def getKingMoves(self, r, c, moves):
