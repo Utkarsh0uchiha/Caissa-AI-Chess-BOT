@@ -60,12 +60,13 @@ def main():
                     move = chessEngine.Move(
                         playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    if move in validMoves:
-                        gs.makeMove(move)
-                        moveMade = True
-                        sqSelected = ()  # reset user clicks
-                        playerClicks = []
-                    else:
+                    for i in range(len(validMoves)):
+                        if move == validMoves[i]:
+                            gs.makeMove(validMoves[i])
+                            moveMade = True
+                            sqSelected = ()  # reset user clicks
+                            playerClicks = []
+                    if not moveMade:
                         playerClicks = [sqSelected]
                         # key handlers
             elif e.type == p.KEYDOWN and e.key == p.K_z:  # undo when 'z' is pressed
