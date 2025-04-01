@@ -2,19 +2,44 @@ import pygame as p  # type: ignore
 import chessEngine
 
 p.init()
-p.display.set_caption("Caïssa Chess")  # Change window title
-# Example: using the white king as the icon
+p.display.set_caption("Caïssa Chess")
 icon = p.image.load("logo.png")
 p.display.set_icon(icon)
 
-WIDTH = HEIGHT = 512
+# Define colors for a cleaner aesthetic
+LIGHT_SQUARE = "#F0D9B5"  # Soft beige
+DARK_SQUARE = "#B58863"   # Warm brown
+BG_COLOR = "#2C3E50"      # Dark blue-gray
+HIGHLIGHT_COLOR = (170, 162, 58, 100)  # Golden yellow with transparency
+LAST_MOVE_COLOR = (100, 111, 159, 120)  # Soft blue with transparency
+TEXT_COLOR = "#ECF0F1"    # Off-white
+BUTTON_COLOR = "#34495E"  # Darker blue-gray
+BUTTON_HOVER = "#4A5C6B"  # Lighter when hovered
+ACCENT_COLOR = "#3498DB"  # Bright blue for accents
 
+# Board dimensions
+WIDTH = HEIGHT = 560
 DIMENSION = 8
 SQ_SIZE = HEIGHT // DIMENSION
-MAX_FPS = 15
-IMAGES = {}
+MAX_FPS = 60  # Smoother animations
 
-# global initialization of the images in the main once
+# Add padding around the board
+PADDING = 40
+WINDOW_WIDTH = WIDTH + PADDING * 2
+
+# Button dimensions
+BUTTON_WIDTH = 120
+BUTTON_HEIGHT = 40
+BUTTON_MARGIN = 20
+
+# Bottom panel for buttons and status
+PANEL_HEIGHT = 80
+WINDOW_HEIGHT = HEIGHT + PADDING * 2 + PANEL_HEIGHT
+
+# Global variables
+IMAGES = {}
+game_over = False
+game_result = ""
 
 
 def loadImages():
@@ -25,120 +50,297 @@ def loadImages():
             p.image.load("pieces/" + piece + ".png"), (SQ_SIZE, SQ_SIZE)
         )
 
-# this is the main driver code of our program, it'll handle the input and updating the graphics
+# Check if mouse is over a button
+
+
+def is_over_button(pos, button_rect):
+    return button_rect.collidepoint(pos)
+
+# Draw a button with hover effect
+
+
+def draw_button(screen, rect, text, font, hover=False):
+    color = BUTTON_HOVER if hover else BUTTON_COLOR
+    p.draw.rect(screen, p.Color(color), rect, border_radius=5)
+    text_surf = font.render(text, True, p.Color(TEXT_COLOR))
+    text_rect = text_surf.get_rect(center=rect.center)
+    screen.blit(text_surf, text_rect)
 
 
 def main():
-    screen = p.display.set_mode((WIDTH, HEIGHT))
+    global game_over, game_result
+
+    screen = p.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     clock = p.time.Clock()
-    screen.fill(p.Color("white"))
+
+    # Create modern, clean fonts
+    button_font = p.font.SysFont("Segoe UI", 16)
+    result_font = p.font.SysFont("Segoe UI", 20, bold=True)
+
+    # Initialize game state
     gs = chessEngine.GameState()
     validMoves = gs.getValidMoves()
-    moveMade = False  # flag var for when a move is made
-    isUndo = False    # new flag to track undo operations
-    loadImages()      # only do this once, before the while loop
+    moveMade = False
+    isUndo = False
+    loadImages()
     running = True
-    sqSelected = ()   # no square seleceted rn
-    playerClicks = []  # keep track of player clicks
+    sqSelected = ()
+    playerClicks = []
+
+    # Create button rectangles
+    reset_button = p.Rect(
+        WINDOW_WIDTH//2 - BUTTON_WIDTH - BUTTON_MARGIN//2,
+        HEIGHT + PADDING * 2 + PANEL_HEIGHT//2 - BUTTON_HEIGHT//2,
+        BUTTON_WIDTH,
+        BUTTON_HEIGHT
+    )
+
+    undo_button = p.Rect(
+        WINDOW_WIDTH//2 + BUTTON_MARGIN//2,
+        HEIGHT + PADDING * 2 + PANEL_HEIGHT//2 - BUTTON_HEIGHT//2,
+        BUTTON_WIDTH,
+        BUTTON_HEIGHT
+    )
+
+    # Track button hover states
+    reset_hover = False
+    undo_hover = False
+
+    # Function to reset the game
+    def resetGame():
+        nonlocal gs, validMoves, moveMade, sqSelected, playerClicks
+        global game_over, game_result
+        gs = chessEngine.GameState()
+        validMoves = gs.getValidMoves()
+        moveMade = False
+        sqSelected = ()
+        playerClicks = []
+        game_over = False
+        game_result = ""
 
     while running:
+        mouse_pos = p.mouse.get_pos()
+
+        # Update button hover states
+        reset_hover = is_over_button(mouse_pos, reset_button)
+        undo_hover = is_over_button(mouse_pos, undo_button)
+
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
-            # mouse handler
+
+            # Mouse handler
             elif e.type == p.MOUSEBUTTONDOWN:
-                location = p.mouse.get_pos()  # gets the (x,y) location of mouse
-                col = location[0]//SQ_SIZE
-                row = location[1]//SQ_SIZE
-                if sqSelected == (row, col):  # the user clicked the same square twice
-                    sqSelected = ()  # deselect
-                    playerClicks = []  # clear players click
-                else:
-                    sqSelected = (row, col)
-                    # append for both 1st and 2nd clicks
-                    playerClicks.append(sqSelected)
-                if len(playerClicks) == 2:  # after 2nd click
-                    move = chessEngine.Move(
-                        playerClicks[0], playerClicks[1], gs.board)
-                    print(move.getChessNotation())
-                    for i in range(len(validMoves)):
-                        if move == validMoves[i]:
-                            gs.makeMove(validMoves[i])
-                            moveMade = True
-                            isUndo = False  # This is a regular move, not an undo
-                            sqSelected = ()  # reset user clicks
+                location = p.mouse.get_pos()
+
+                # Check if reset button was clicked
+                if is_over_button(location, reset_button):
+                    resetGame()
+                    continue
+
+                # Check if undo button was clicked
+                if is_over_button(location, undo_button) and len(gs.moveLog) > 0:
+                    gs.undoMove()
+                    moveMade = True
+                    isUndo = True
+                    game_over = False
+                    game_result = ""
+                    continue
+
+                # Process board clicks only if game is not over
+                if not game_over:
+                    # Adjust for padding to get board coordinates
+                    board_x = location[0] - PADDING
+                    board_y = location[1] - PADDING
+
+                    # Check if click is within the board
+                    if 0 <= board_x < WIDTH and 0 <= board_y < HEIGHT:
+                        col = board_x // SQ_SIZE
+                        row = board_y // SQ_SIZE
+
+                        if sqSelected == (row, col):  # Clicked same square twice
+                            sqSelected = ()
                             playerClicks = []
-                    if not moveMade:
-                        playerClicks = [sqSelected]
-            # key handlers
-            elif e.type == p.KEYDOWN and e.key == p.K_z:  # undo when 'z' is pressed
+                        else:
+                            sqSelected = (row, col)
+                            playerClicks.append(sqSelected)
+
+                        if len(playerClicks) == 2:  # After 2nd click
+                            move = chessEngine.Move(
+                                playerClicks[0], playerClicks[1], gs.board)
+
+                            for i in range(len(validMoves)):
+                                if move == validMoves[i]:
+                                    gs.makeMove(validMoves[i])
+                                    moveMade = True
+                                    isUndo = False
+                                    sqSelected = ()
+                                    playerClicks = []
+
+                            if not moveMade:
+                                playerClicks = [sqSelected]
+
+            # Key handlers (keeping Z as keyboard shortcut for undo)
+            elif e.type == p.KEYDOWN and e.key == p.K_z and len(gs.moveLog) > 0:
                 gs.undoMove()
                 moveMade = True
-                isUndo = True  # Flag this as an undo operation
+                isUndo = True
+                game_over = False
+                game_result = ""
 
         if moveMade:
-            if not isUndo and len(gs.moveLog) > 0:  # Only animate if not an undo
+            if not isUndo and len(gs.moveLog) > 0:
                 animateMove(gs.moveLog[-1], screen, gs.board, clock)
             validMoves = gs.getValidMoves()
             moveMade = False
-            isUndo = False  # Reset the undo flag
+            isUndo = False
 
-        # Call this function to draw the board
+            # Check for game end conditions
+            if gs.checkmate:
+                game_over = True
+                if gs.whiteToMove:
+                    game_result = "Black Wins by Checkmate"
+                else:
+                    game_result = "White Wins by Checkmate"
+            elif gs.stalemate:
+                game_over = True
+                game_result = "Draw by Stalemate"
+
+        # Draw everything
+        screen.fill(p.Color(BG_COLOR))
+
+        # Draw board with padding
         drawGameState(screen, gs, validMoves, sqSelected)
-        clock.tick(MAX_FPS)
+
+        # Draw buttons
+        draw_button(screen, reset_button, "New Game", button_font, reset_hover)
+        draw_button(screen, undo_button, "Undo Move", button_font, undo_hover)
+
+        # Display turn indicator
+        turn_text = "White to Move" if gs.whiteToMove else "Black to Move"
+        turn_surf = button_font.render(turn_text, True, p.Color(TEXT_COLOR))
+        turn_rect = turn_surf.get_rect(
+            center=(WINDOW_WIDTH//2, HEIGHT + PADDING + 20))
+        screen.blit(turn_surf, turn_rect)
+
+        # Display game result if game is over
+        if game_over:
+            # Create semi-transparent overlay for game over message
+            overlay = p.Surface((WIDTH, HEIGHT))
+            overlay.set_alpha(180)
+            overlay.fill(p.Color(BG_COLOR))
+            screen.blit(overlay, (PADDING, PADDING))
+
+            result_surf = result_font.render(
+                game_result, True, p.Color(TEXT_COLOR))
+            result_rect = result_surf.get_rect(
+                center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2 - 20))
+            screen.blit(result_surf, result_rect)
+
+            # Add prompt to restart
+            prompt_surf = button_font.render(
+                "Click 'New Game' to play again", True, p.Color(TEXT_COLOR))
+            prompt_rect = prompt_surf.get_rect(
+                center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2 + 20))
+            screen.blit(prompt_surf, prompt_rect)
+
         p.display.flip()
+        clock.tick(MAX_FPS)
 
-
-# Highlights the square selected and moves for the pices selected
 
 def highlightSquares(screen, gs, validMoves, sqSelected):
-    # Create a new surface for highlights
-    s = p.Surface((SQ_SIZE, SQ_SIZE))
-    s.set_alpha(100)  # Transparency value
-
-    # Highlight last move first (so it appears underneath other highlights)
-    if gs.moveLog:  # Check if moveLog is not empty
+    # Highlight last move
+    if gs.moveLog:
         lastMove = gs.moveLog[-1]
-        # Use a distinct color for last move highlight
-        s.fill(p.Color('blue'))
-        # Highlight start square
-        screen.blit(s, (lastMove.startCol*SQ_SIZE, lastMove.startRow*SQ_SIZE))
-        # Highlight end square
-        screen.blit(s, (lastMove.endCol*SQ_SIZE, lastMove.endRow*SQ_SIZE))
+        last_move_s = p.Surface((SQ_SIZE, SQ_SIZE))
+        last_move_s.fill(p.Color(LAST_MOVE_COLOR))
 
-    # Then highlight the selected square and valid moves
+        # Highlight both squares of last move
+        screen.blit(last_move_s, (PADDING + lastMove.startCol *
+                    SQ_SIZE, PADDING + lastMove.startRow*SQ_SIZE))
+        screen.blit(last_move_s, (PADDING + lastMove.endCol *
+                    SQ_SIZE, PADDING + lastMove.endRow*SQ_SIZE))
+
+    # Highlight selected square and valid moves
     if sqSelected != ():
         r, c = sqSelected
+
         # Check if the selected piece belongs to the current player
         if gs.board[r][c][0] == ('W' if gs.whiteToMove else 'B'):
-            # Highlight selected square
-            s.fill(p.Color('gray'))
-            screen.blit(s, (c*SQ_SIZE, r*SQ_SIZE))
+            # Create highlighting surface
+            s = p.Surface((SQ_SIZE, SQ_SIZE))
+            s.set_alpha(100)
+            s.fill(p.Color(HIGHLIGHT_COLOR))
 
-            # Highlight possible moves from that square
-            s.fill(p.Color('yellow'))
+            # Highlight selected square
+            screen.blit(s, (PADDING + c*SQ_SIZE, PADDING + r*SQ_SIZE))
+
+            # Highlight valid moves from that square with subtle circles
             for move in validMoves:
                 if move.startRow == r and move.startCol == c:
-                    screen.blit(s, (move.endCol*SQ_SIZE, move.endRow*SQ_SIZE))
-# Responsible for all the graphics within current game state
+                    if gs.board[move.endRow][move.endCol] == '--':
+                        # Empty square - draw circle
+                        radius = SQ_SIZE // 6
+                        center = (PADDING + move.endCol*SQ_SIZE + SQ_SIZE//2,
+                                  PADDING + move.endRow*SQ_SIZE + SQ_SIZE//2)
+                        p.draw.circle(screen, p.Color(
+                            HIGHLIGHT_COLOR), center, radius)
+                    else:
+                        # Capture square - draw ring
+                        s.set_alpha(180)
+                        screen.blit(s, (PADDING + move.endCol *
+                                    SQ_SIZE, PADDING + move.endRow*SQ_SIZE))
+                        inner = p.Surface((SQ_SIZE*0.8, SQ_SIZE*0.8))
+                        inner.fill(
+                            p.Color(colors[(move.endRow + move.endCol) % 2]))
+                        inner_pos = (PADDING + move.endCol*SQ_SIZE + SQ_SIZE*0.1,
+                                     PADDING + move.endRow*SQ_SIZE + SQ_SIZE*0.1)
+                        screen.blit(inner, inner_pos)
 
 
 def drawGameState(screen, gs, validMoves, sqSelected):
-    drawBoard(screen)  # Draw squares on the board
+    drawBoard(screen)
     highlightSquares(screen, gs, validMoves, sqSelected)
-    drawPieces(screen, gs.board)  # Draw pieces on top of the squares
+    drawPieces(screen, gs.board)
 
-# Draw squares on the board
+    # Draw border around the board
+    border_rect = p.Rect(PADDING-2, PADDING-2, WIDTH+4, HEIGHT+4)
+    p.draw.rect(screen, p.Color(ACCENT_COLOR), border_rect, 2, border_radius=3)
 
 
 def drawBoard(screen):
     global colors
-    colors = [p.Color("#EBEBD0"), p.Color("#769454")]
-    for r in range(DIMENSION):  # Fixed the incorrect range syntax
+    colors = [p.Color(LIGHT_SQUARE), p.Color(DARK_SQUARE)]
+
+    for r in range(DIMENSION):
         for c in range(DIMENSION):
             color = colors[(r + c) % 2]
             p.draw.rect(screen, color, p.Rect(
-                c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                PADDING + c * SQ_SIZE, PADDING + r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+            # Optional: Add subtle rank/file notation
+            if r == 7:  # Bottom rank
+                if (r + c) % 2 == 0:
+                    text_color = p.Color(DARK_SQUARE)
+                else:
+                    text_color = p.Color(LIGHT_SQUARE)
+
+                file_font = p.font.SysFont("Segoe UI", 12)
+                file_text = file_font.render(
+                    chr(ord('a') + c), True, text_color)
+                screen.blit(file_text, (PADDING + c *
+                            SQ_SIZE + 5, PADDING + HEIGHT - 15))
+
+            if c == 0:  # Left file
+                if (r + c) % 2 == 0:
+                    text_color = p.Color(DARK_SQUARE)
+                else:
+                    text_color = p.Color(LIGHT_SQUARE)
+
+                rank_font = p.font.SysFont("Segoe UI", 12)
+                rank_text = rank_font.render(str(8-r), True, text_color)
+                screen.blit(rank_text, (PADDING + 5,
+                            PADDING + r * SQ_SIZE + 5))
 
 
 def drawPieces(screen, board):
@@ -147,36 +349,44 @@ def drawPieces(screen, board):
             piece = board[r][c]
             if piece != "--":
                 screen.blit(IMAGES[piece], p.Rect(
-                    c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
-
-# animating a move
+                    PADDING + c * SQ_SIZE, PADDING + r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 def animateMove(move, screen, board, clock):
     global colors
     dR = move.endRow - move.startRow
     dC = move.endCol - move.startCol
-    framesPerSquare = 10  # frmanes to move one square
+    framesPerSquare = 5  # Faster animation for minimalist feel
     frameCount = (abs(dR) + abs(dC)) + framesPerSquare
+
     for frame in range(frameCount + 1):
-        r, c = (move.startRow + dR*frame /
-                frameCount, move.startCol + dC*frame/frameCount)
+        r, c = (move.startRow + dR*frame/frameCount,
+                move.startCol + dC*frame/frameCount)
+
+        # Redraw everything
+        screen.fill(p.Color(BG_COLOR))
         drawBoard(screen)
-        drawPieces(screen, board)
-        # erase the piece moved from its ending square
-        color = colors[(move.endRow + move.endCol) % 2]
-        endSquare = p.Rect(move.endCol*SQ_SIZE,
-                           move.endRow*SQ_SIZE, SQ_SIZE, SQ_SIZE)
-        p.draw.rect(screen, color, endSquare)
-        # draw captured piece onto rectangle
-        if move.pieceCaptured != '--':
-            screen.blit(IMAGES[move.pieceCaptured], endSquare)
-        # draw moving piece
+
+        # Draw border
+        border_rect = p.Rect(PADDING-2, PADDING-2, WIDTH+4, HEIGHT+4)
+        p.draw.rect(screen, p.Color(ACCENT_COLOR),
+                    border_rect, 2, border_radius=3)
+
+        # Draw all pieces except the moving one
+        for row in range(DIMENSION):
+            for col in range(DIMENSION):
+                piece = board[row][col]
+                if piece != "--" and not (row == move.startRow and col == move.startCol):
+                    screen.blit(IMAGES[piece], p.Rect(
+                        PADDING + col * SQ_SIZE, PADDING + row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+        # Draw moving piece
         screen.blit(IMAGES[move.pieceMoved], p.Rect(
-            c*SQ_SIZE, r*SQ_SIZE, SQ_SIZE, SQ_SIZE))
+            PADDING + c * SQ_SIZE, PADDING + r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
         p.display.flip()
-        clock.tick(60)
-                                
+        clock.tick(MAX_FPS)
+
 
 if __name__ == "__main__":
     main()
