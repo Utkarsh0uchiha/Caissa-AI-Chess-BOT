@@ -1,5 +1,6 @@
 import pygame as p  # type: ignore
 import chessEngine
+import SmartMoveFinder
 
 p.init()
 p.display.set_caption("Caïssa Chess")
@@ -86,6 +87,8 @@ def main():
     running = True
     sqSelected = ()
     playerClicks = []
+    playerOne = True  # if human is playing white, then this will be True, If an AI is Playing then it will be false
+    playerTwo = False  # same as above but for black
 
     # Create button rectangles
     reset_button = p.Rect(
@@ -124,6 +127,8 @@ def main():
         # Update button hover states
         reset_hover = is_over_button(mouse_pos, reset_button)
         undo_hover = is_over_button(mouse_pos, undo_button)
+        humanTurn = (gs.whiteToMove and playerOne) or (
+            not gs.whiteToMove and playerTwo)
 
         for e in p.event.get():
             if e.type == p.QUIT:
@@ -148,7 +153,7 @@ def main():
                     continue
 
                 # Process board clicks only if game is not over
-                if not game_over:
+                if not game_over and humanTurn:
                     # Adjust for padding to get board coordinates
                     board_x = location[0] - PADDING
                     board_y = location[1] - PADDING
@@ -187,6 +192,14 @@ def main():
                 isUndo = True
                 game_over = False
                 game_result = ""
+
+        # AI move finder logic
+        if not game_over and not humanTurn:
+            AIMove = SmartMoveFinder.findBestMoveMinMax(gs, validMoves)
+            if AIMove is None:
+                AIMove = SmartMoveFinder.findRandomMove(validMoves)
+            gs.makeMove(AIMove)
+            moveMade = True
 
         if moveMade:
             if not isUndo and len(gs.moveLog) > 0:
@@ -353,39 +366,62 @@ def drawPieces(screen, board):
 
 
 def animateMove(move, screen, board, clock):
+    """Animates a chess piece moving from start to end position with smooth motion"""
     global colors
     dR = move.endRow - move.startRow
     dC = move.endCol - move.startCol
-    framesPerSquare = 5  # Faster animation for minimalist feel
-    frameCount = (abs(dR) + abs(dC)) + framesPerSquare
 
+    # Optimize animation speed and smoothness
+    fps = 60  # Target fps for smooth animation
+    duration = 0.2  # Animation duration in seconds
+    frameCount = int(fps * duration)
+
+    # Get the moving piece
+    movingPiece = move.pieceMoved
+
+    # Create a copy of the board for animation
+    tempBoard = [row[:] for row in board]
+    # Temporarily remove the piece from the board
+    tempBoard[move.startRow][move.startCol] = "--"
+
+    # Pre-render the static board background once
+    staticBG = p.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+    staticBG.fill(p.Color(BG_COLOR))
+    drawBoard(staticBG)
+
+    # Draw border around the board
+    border_rect = p.Rect(PADDING-2, PADDING-2, WIDTH+4, HEIGHT+4)
+    p.draw.rect(staticBG, p.Color(ACCENT_COLOR),
+                border_rect, 2, border_radius=3)
+
+    # Draw all non-moving pieces on the static background
+    for row in range(DIMENSION):
+        for col in range(DIMENSION):
+            piece = tempBoard[row][col]
+            if piece != "--":
+                staticBG.blit(IMAGES[piece], p.Rect(
+                    PADDING + col * SQ_SIZE, PADDING + row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+
+    # Calculate the step size for smooth motion
+    stepR = dR / frameCount if frameCount > 0 else dR
+    stepC = dC / frameCount if frameCount > 0 else dC
+
+    # Animation loop
     for frame in range(frameCount + 1):
-        r, c = (move.startRow + dR*frame/frameCount,
-                move.startCol + dC*frame/frameCount)
+        # Calculate the position for this frame using float for smoother interpolation
+        r = move.startRow + stepR * frame
+        c = move.startCol + stepC * frame
 
-        # Redraw everything
-        screen.fill(p.Color(BG_COLOR))
-        drawBoard(screen)
+        # Draw the static background (includes board and non-moving pieces)
+        screen.blit(staticBG, (0, 0))
 
-        # Draw border
-        border_rect = p.Rect(PADDING-2, PADDING-2, WIDTH+4, HEIGHT+4)
-        p.draw.rect(screen, p.Color(ACCENT_COLOR),
-                    border_rect, 2, border_radius=3)
-
-        # Draw all pieces except the moving one
-        for row in range(DIMENSION):
-            for col in range(DIMENSION):
-                piece = board[row][col]
-                if piece != "--" and not (row == move.startRow and col == move.startCol):
-                    screen.blit(IMAGES[piece], p.Rect(
-                        PADDING + col * SQ_SIZE, PADDING + row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
-
-        # Draw moving piece
-        screen.blit(IMAGES[move.pieceMoved], p.Rect(
+        # Draw the moving piece at its current position
+        screen.blit(IMAGES[movingPiece], p.Rect(
             PADDING + c * SQ_SIZE, PADDING + r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
-        p.display.flip()
-        clock.tick(MAX_FPS)
+        # Update the display and maintain framerate
+        p.display.update()
+        clock.tick(fps)
 
 
 if __name__ == "__main__":

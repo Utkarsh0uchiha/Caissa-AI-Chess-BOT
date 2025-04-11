@@ -138,7 +138,9 @@ class GameState:
                     rookCol = 0  # Rook's original column
                     self.board[move.endRow][rookCol] = self.board[move.endRow][move.endCol + 1]
                     self.board[move.endRow][move.endCol + 1] = '--'
-
+            # ADD THESE
+            self.checkmate = False
+            self.stalemate = False
     # update the castle rights given the move
 
     def updateCastleRights(self, move):
