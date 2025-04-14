@@ -29,10 +29,15 @@ class GameState:
         self.currentCastlingRight = CastleRights(True, True, True, True)
         self.castleRightsLog = [CastleRights(
             self.currentCastlingRight.wks, self.currentCastlingRight.bks,  self.currentCastlingRight.wqs, self.currentCastlingRight.bqs)]
-
+        self.fiftyMoveRule = 0  # Counter for the fifty-move rule
+        self.positionLog = []  # Log positions for threefold repetition check
+        self.capturedPieces = {'W': [], 'B': []}  # Track captured pieces
+        self.saveCurrentPosition()  # Save initial position
     # takes a move asa parameter and executes it (it won't work for pawn promotion and en-passant or castling)
 
     def makeMove(self, move):
+        piece_captured = self.board[move.endRow][move.endCol]
+        pawn_moved = move.pieceMoved[1] == 'p'
         self.board[move.startRow][move.startCol] = "--"
         self.board[move.endRow][move.endCol] = move.pieceMoved
         self.moveLog.append(move)  # log the move so we can undo it later
@@ -81,6 +86,20 @@ class GameState:
         self.updateCastleRights(move)
         self.castleRightsLog.append(CastleRights(
             self.currentCastlingRight.wks, self.currentCastlingRight.bks,  self.currentCastlingRight.wqs, self.currentCastlingRight.bqs))
+
+        # Update fifty-move counter
+        if pawn_moved or piece_captured != '--':
+            self.fiftyMoveRule = 0
+        else:
+            self.fiftyMoveRule += 1
+
+        # Track captured pieces
+        if piece_captured != '--':
+            self.capturedPieces[piece_captured[0]].append(piece_captured[1])
+
+        # Save position for threefold repetition check
+        self.saveCurrentPosition()
+
     # undo the last move made
 
     def undoMove(self):
@@ -97,26 +116,14 @@ class GameState:
             elif move.pieceMoved == 'Bk':
                 self.BlackKingLocation = (move.startRow, move.startCol)
 
+
             # Undo en passant
+            # In the undoMove method, replace the enpassant handling with:
             if move.isEnpassantMove:
-                # Place the moved piece back to its original position
-                self.board[move.startRow][move.startCol] = move.pieceMoved
                 self.board[move.endRow][move.endCol] = '--'
-
-                # Restore the captured pawn
-                if move.pieceMoved[0] == 'W':
-                    # Restore black pawn
-                    self.board[move.endRow + 1][move.endCol] = 'Bp'
-                else:
-                    # Restore white pawn
-                    self.board[move.endRow - 1][move.endCol] = 'Wp'
-
-                # Update enpassant possible
-                self.enpassantPossible = (move.endRow, move.endCol)
-
-            # Undo a 2 square pawn advance
-            elif move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
-                self.enpassantPossible = ()
+                capturedPawnRow = move.endRow + (1 if move.pieceMoved[0] == 'W' else -1)
+                self.board[capturedPawnRow][move.endCol] = (
+                    'B' if move.pieceMoved[0] == 'W' else 'W') + 'p'
 
             # undo the castling rights
             self.castleRightsLog.pop()  # get rid of new castle rights from the move we're undoing
@@ -125,22 +132,28 @@ class GameState:
                 newRights.wks, newRights.bks, newRights.wqs, newRights.bqs)
 
             # undo castle move
+            # In the undoMove method, replace the castle handling with:
             if move.isCastleMove:
                 if move.endCol - move.startCol == 2:  # kingside castle
-                    # Find the rook that was moved (it should be at endCol-1)
-                    # Move it back to its original position (endCol+1)
-                    rookCol = 7  # Rook's original column
-                    self.board[move.endRow][rookCol] = self.board[move.endRow][move.endCol - 1]
+                    self.board[move.endRow][7] = self.board[move.endRow][move.endCol - 1]
                     self.board[move.endRow][move.endCol - 1] = '--'
                 else:  # queenside castle
-                    # Find the rook that was moved (it should be at endCol+1)
-                    # Move it back to its original position (endCol-2)
-                    rookCol = 0  # Rook's original column
-                    self.board[move.endRow][rookCol] = self.board[move.endRow][move.endCol + 1]
+                    self.board[move.endRow][0] = self.board[move.endRow][move.endCol + 1]
                     self.board[move.endRow][move.endCol + 1] = '--'
+                    
             # ADD THESE
             self.checkmate = False
             self.stalemate = False
+            # Remove the last position
+            if len(self.positionLog) > 0:
+                self.positionLog.pop()
+
+            # Restore captured piece to the tracker if a piece was uncaptured
+            # Restore captured piece to the tracker if a piece was uncaptured
+            if move.pieceCaptured != '--':
+                self.capturedPieces[move.pieceCaptured[0]].pop()
+
+
     # update the castle rights given the move
 
     def updateCastleRights(self, move):
@@ -195,16 +208,27 @@ class GameState:
         if len(moves) == 0:
             if self.inCheck():
                 self.checkmate = True
-                if self.whiteToMove:
-                    print("BLACK WON!!!")
-                else:
-                    print("WHITE WON!!!")
+                # Message will be displayed in the UI
             else:
                 self.stalemate = True
-                print("STALEMATE, DRAW!!!")
+                # Message will be displayed in the UI
         else:
             self.checkmate = False
             self.stalemate = False
+
+            # Check additional draw conditions
+            if self.fiftyMoveRule >= 100:  # 50 moves = 100 half-moves
+                self.stalemate = True
+                # Set a flag to indicate fifty-move rule draw
+                self.drawReason = "fifty-move rule"
+            elif self.checkThreefoldRepetition():
+                self.stalemate = True
+                self.drawReason = "threefold repetition"
+            elif self.checkInsufficientMaterial():
+                self.stalemate = True
+                self.drawReason = "insufficient material"
+            else:
+                self.drawReason = ""
 
         self.enpassantPossible = tempEnpassantPossible
         self.currentCastlingRight = tempCastleRights
@@ -439,6 +463,70 @@ class GameState:
                         break
                 else:  # Out of bounds
                     break
+
+    def saveCurrentPosition(self):
+        position = []
+        for row in self.board:
+            position.append(''.join(row))
+        position_str = ''.join(position) + ('W' if self.whiteToMove else 'B')
+        # Add castling rights to the position string
+        position_str += str(int(self.currentCastlingRight.wks)) + str(int(self.currentCastlingRight.wqs)) + \
+            str(int(self.currentCastlingRight.bks)) + \
+            str(int(self.currentCastlingRight.bqs))
+        # Add en passant possibilities
+        if self.enpassantPossible:
+            position_str += f"{self.enpassantPossible[0]}{self.enpassantPossible[1]}"
+        self.positionLog.append(position_str)
+
+    def checkThreefoldRepetition(self):
+        """Check if the current position has occurred three times"""
+        if len(self.positionLog) >= 5:  # Need at least 5 positions for 3 repetitions
+            current_position = self.positionLog[-1]
+            repetition_count = self.positionLog.count(current_position)
+            return repetition_count >= 3
+        return False
+
+    def checkInsufficientMaterial(self):
+        """Check if there is insufficient material for checkmate"""
+        white_pieces = []
+        black_pieces = []
+
+        # Count pieces for each side
+        for row in self.board:
+            for square in row:
+                if square[0] == 'W' and square[1] != 'k':
+                    white_pieces.append(square[1])
+                elif square[0] == 'B' and square[1] != 'k':
+                    black_pieces.append(square[1])
+
+        # King vs King
+        if not white_pieces and not black_pieces:
+            return True
+
+        # King and Bishop/Knight vs King
+        if (len(white_pieces) == 1 and white_pieces[0] in ['b', 'n'] and not black_pieces) or \
+                (len(black_pieces) == 1 and black_pieces[0] in ['b', 'n'] and not white_pieces):
+            return True
+
+        # King and Bishop vs King and Bishop (same color bishops)
+        if len(white_pieces) == 1 and white_pieces[0] == 'b' and \
+                len(black_pieces) == 1 and black_pieces[0] == 'b':
+            white_bishop_color = None
+            black_bishop_color = None
+
+            # Find the bishop squares
+            for r in range(8):
+                for c in range(8):
+                    if self.board[r][c] == 'Wb':
+                        white_bishop_color = (r + c) % 2
+                    elif self.board[r][c] == 'Bb':
+                        black_bishop_color = (r + c) % 2
+
+            # If bishops are on same color squares, it's a draw
+            if white_bishop_color == black_bishop_color:
+                return True
+
+        return False
 
 
 class CastleRights():
