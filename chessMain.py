@@ -195,7 +195,7 @@ def main():
 
         # AI move finder logic
         if not game_over and not humanTurn:
-            AIMove = SmartMoveFinder.findBestMoveMinMax(gs, validMoves)
+            AIMove = SmartMoveFinder.findBestMoveNegaMax(gs, validMoves)
             if AIMove is None:
                 AIMove = SmartMoveFinder.findRandomMove(validMoves)
             gs.makeMove(AIMove)
