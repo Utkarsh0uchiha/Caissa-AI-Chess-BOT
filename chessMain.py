@@ -33,7 +33,7 @@ WINDOW_WIDTH = WIDTH + PADDING * 2
 
 # Button dimensions
 BUTTON_WIDTH = 140
-BUTTON_HEIGHT = 40
+BUTTON_HEIGHT = 50
 BUTTON_MARGIN = 20
 
 # Bottom panel for buttons and status
@@ -47,7 +47,7 @@ game_result = ""
 
 # Player info panel dimensions
 INFO_PANEL_WIDTH = 240
-WINDOW_WIDTH = WIDTH + PADDING * 2 + INFO_PANEL_WIDTH
+WINDOW_WIDTH = WIDTH + PADDING * 3 + INFO_PANEL_WIDTH
 
 # Button dimensions for abort/resign
 RESIGN_BUTTON_WIDTH = 120
@@ -110,7 +110,7 @@ def main():
     sqSelected = ()
     playerClicks = []
     playerOne = True  # if human is playing white, then this will be True, If an AI is Playing then it will be false
-    playerTwo = True  # same as above but for black
+    playerTwo = False  # same as above but for black
 
     # Position resign button in a more visible spot like chess.com
     resign_button = p.Rect(
@@ -160,13 +160,13 @@ def main():
         p.draw.rect(screen, p.Color(ACCENT_COLOR),
                     panel_rect, 2, border_radius=3)
 
-        # Draw player names with better spacing and sizing
-        white_name_y = HEIGHT - PADDING - 220
+        # Player names
+        white_name_y = HEIGHT - PADDING - 100
         black_name_y = PADDING + 20
 
         # White player section (bottom)
         white_section = p.Rect(WIDTH + PADDING * 2 + 10, white_name_y - 10,
-                               INFO_PANEL_WIDTH - 20, 60)
+                               INFO_PANEL_WIDTH - 20, 50)
         p.draw.rect(screen, p.Color("#2E4053"), white_section, border_radius=5)
 
         white_name_text = player_font.render(
@@ -175,14 +175,14 @@ def main():
 
         # Black player section (top)
         black_section = p.Rect(WIDTH + PADDING * 2 + 10, black_name_y - 10,
-                               INFO_PANEL_WIDTH - 20, 60)
+                               INFO_PANEL_WIDTH - 20, 50)
         p.draw.rect(screen, p.Color("#2E4053"), black_section, border_radius=5)
 
         black_name_text = player_font.render(
             player_names["Black"], True, p.Color(TEXT_COLOR))
         screen.blit(black_name_text, (WIDTH + PADDING * 2 + 20, black_name_y))
 
-        # Indicate active player with a more visible indicator
+        # Indicate active player
         active_y = black_name_y if not gs.whiteToMove else white_name_y
         active_section = black_section if not gs.whiteToMove else white_section
         p.draw.rect(screen, p.Color(ACCENT_COLOR),
@@ -190,110 +190,37 @@ def main():
         p.draw.circle(screen, p.Color(ACCENT_COLOR),
                       (WIDTH + PADDING * 2 + 10, active_y + 10), 5)
 
-        # Material evaluation with better formatting
-        material_score = calculateMaterialScore(gs)
-        if material_score > 0:
-            score_text = f"+{material_score}"
-            score_color = p.Color("#FFFFFF")
-        elif material_score < 0:
-            score_text = f"{material_score}"
-            score_color = p.Color("#FFFFFF")
-        else:
-            score_text = "0"
-            score_color = p.Color("#AAAAAA")
-
-        eval_text = info_font.render(
-            f"Material: {score_text}", True, score_color)
-
-        # Position evaluation text in center of panel
-        eval_rect = p.Rect(WIDTH + PADDING * 2 + 10, HEIGHT//2 - 60,
-                           INFO_PANEL_WIDTH - 20, 40)
-        p.draw.rect(screen, p.Color("#2E4053"), eval_rect, border_radius=5)
-        screen.blit(eval_text, (WIDTH + PADDING * 2 + 20, HEIGHT//2 - 50))
-
-        # Display captured pieces in chess.com style
+        # Draw captured pieces
         drawCapturedPieces(screen, gs, info_font)
 
+        # Draw Evaluation Bar
+        drawEvaluationBar(screen, gs)
+
     def drawCapturedPieces(screen, gs, font):
-        # Create background sections for captured pieces
-        black_captures_section = p.Rect(WIDTH + PADDING * 2 + 10, PADDING + 90,
-                                        INFO_PANEL_WIDTH - 20, 80)
-        p.draw.rect(screen, p.Color("#2E4053"),
-                    black_captures_section, border_radius=5)
+        piece_size = SQ_SIZE // 2.5
+        x_start = WIDTH + PADDING * 2 + 20
+        captured_spacing = piece_size + 8
 
-        white_captures_section = p.Rect(WIDTH + PADDING * 2 + 10, HEIGHT - PADDING - 170,
-                                        INFO_PANEL_WIDTH - 20, 80)
-        p.draw.rect(screen, p.Color("#2E4053"),
-                    white_captures_section, border_radius=5)
+        # Material count trackers
+        white_captured_material = 0
+        black_captured_material = 0
 
-        # Display captured by white (black pieces) - more chess.com style
-        white_captures_text = font.render(
-            "Captured:", True, p.Color(TEXT_COLOR))
-        screen.blit(white_captures_text,
-                    (WIDTH + PADDING * 2 + 20, PADDING + 100))
-
-        # Display captured pieces with material count
-        black_material = 0
-        white_material = 0
-        y_pos = PADDING + 125
-        x_pos = WIDTH + PADDING * 2 + 20
-        piece_size = SQ_SIZE // 2.5  # Slightly smaller pieces for better fit
-
-        # Count piece values for captured pieces
         piece_values = {'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9}
 
-        # Create a sorted display of captured black pieces
-        if 'B' in gs.capturedPieces and gs.capturedPieces['B']:
-            # Group pieces by type
-            piece_counts = {'p': 0, 'n': 0, 'b': 0, 'r': 0, 'q': 0}
-            for piece in gs.capturedPieces['B']:
-                piece_counts[piece.lower()] += 1
-                black_material += piece_values[piece.lower()]
+        # --- BLACK captures WHITE pieces (displayed at top) ---
+        black_captures_label_y = PADDING + 90
+        black_captures_y = black_captures_label_y + 25
 
-            # Display pieces in order: pawn, knight, bishop, rook, queen
-            x_offset = 0
-            for piece_type in ['p', 'n', 'b', 'r', 'q']:
-                count = piece_counts[piece_type]
-                if count > 0:
-                    piece_key = f'B{piece_type}'
-                    scaled_image = p.transform.scale(
-                        IMAGES[piece_key], (piece_size, piece_size))
-                    screen.blit(scaled_image, (x_pos + x_offset, y_pos))
-
-                    # If more than one of this piece, show count
-                    if count > 1:
-                        count_text = font.render(
-                            f"x{count}", True, p.Color(TEXT_COLOR))
-                        screen.blit(count_text, (x_pos + x_offset +
-                                    piece_size - 5, y_pos + piece_size - 15))
-
-                    x_offset += piece_size + 10
-
-        # Show material advantage if any
-        if black_material > 0:
-            material_text = font.render(
-                f"+{black_material}", True, p.Color("#FFFFFF"))
-            screen.blit(material_text, (WIDTH + PADDING * 2 +
-                        INFO_PANEL_WIDTH - 50, PADDING + 100))
-
-        # Captured by black (white pieces)
-        white_captures_text = font.render(
+        black_captures_text = font.render(
             "Captured:", True, p.Color(TEXT_COLOR))
-        screen.blit(white_captures_text, (WIDTH + PADDING *
-                    2 + 20, HEIGHT - PADDING - 160))
+        screen.blit(black_captures_text, (x_start, black_captures_label_y))
 
-        y_pos = HEIGHT - PADDING - 135
-        x_pos = WIDTH + PADDING * 2 + 20
-
-        # Create a sorted display of captured white pieces
-        if 'W' in gs.capturedPieces and gs.capturedPieces['W']:
-            # Group pieces by type
+        if 'W' in gs.capturedPieces:
             piece_counts = {'p': 0, 'n': 0, 'b': 0, 'r': 0, 'q': 0}
             for piece in gs.capturedPieces['W']:
                 piece_counts[piece.lower()] += 1
-                white_material += piece_values[piece.lower()]
+                white_captured_material += piece_values[piece.lower()]
 
-            # Display pieces in order: pawn, knight, bishop, rook, queen
             x_offset = 0
             for piece_type in ['p', 'n', 'b', 'r', 'q']:
                 count = piece_counts[piece_type]
@@ -301,26 +228,98 @@ def main():
                     piece_key = f'W{piece_type}'
                     scaled_image = p.transform.scale(
                         IMAGES[piece_key], (piece_size, piece_size))
-                    screen.blit(scaled_image, (x_pos + x_offset, y_pos))
+                    screen.blit(scaled_image, (x_start +
+                                x_offset, black_captures_y))
 
-                    # If more than one of this piece, show count
                     if count > 1:
                         count_text = font.render(
                             f"x{count}", True, p.Color(TEXT_COLOR))
-                        screen.blit(count_text, (x_pos + x_offset +
-                                    piece_size - 5, y_pos + piece_size - 15))
+                        screen.blit(count_text, (x_start + x_offset +
+                                    piece_size - 5, black_captures_y + piece_size - 15))
 
-                    x_offset += piece_size + 10
+                    x_offset += captured_spacing
 
-        # Show material advantage if any
-        if white_material > 0:
-            material_text = font.render(
-                f"+{white_material}", True, p.Color("#FFFFFF"))
-            screen.blit(material_text, (WIDTH + PADDING * 2 +
-                        INFO_PANEL_WIDTH - 50, HEIGHT - PADDING - 160))
+        # --- WHITE captures BLACK pieces (displayed at bottom) ---
+        white_captures_label_y = HEIGHT - PADDING - 190
+        white_captures_y = white_captures_label_y + 25
+
+        white_captures_text = font.render(
+            "Captured:", True, p.Color(TEXT_COLOR))
+        screen.blit(white_captures_text, (x_start, white_captures_label_y))
+
+        if 'B' in gs.capturedPieces:
+            piece_counts = {'p': 0, 'n': 0, 'b': 0, 'r': 0, 'q': 0}
+            for piece in gs.capturedPieces['B']:
+                piece_counts[piece.lower()] += 1
+                black_captured_material += piece_values[piece.lower()]
+
+            x_offset = 0
+            for piece_type in ['p', 'n', 'b', 'r', 'q']:
+                count = piece_counts[piece_type]
+                if count > 0:
+                    piece_key = f'B{piece_type}'
+                    scaled_image = p.transform.scale(
+                        IMAGES[piece_key], (piece_size, piece_size))
+                    screen.blit(scaled_image, (x_start +
+                                x_offset, white_captures_y))
+
+                    if count > 1:
+                        count_text = font.render(
+                            f"x{count}", True, p.Color(TEXT_COLOR))
+                        screen.blit(count_text, (x_start + x_offset +
+                                    piece_size - 5, white_captures_y + piece_size - 15))
+
+                    x_offset += captured_spacing
+
+        # --- Show material advantage if any ---
+        # Black's material advantage
+        material_diff = white_captured_material - black_captured_material
+        if material_diff > 0:
+            adv_text = font.render(
+                f"+{material_diff}", True, p.Color("#FFFFFF"))
+            screen.blit(adv_text, (WIDTH + PADDING * 2 +
+                        INFO_PANEL_WIDTH - 50, black_captures_label_y))
+        elif material_diff < 0:
+            adv_text = font.render(
+                f"+{abs(material_diff)}", True, p.Color("#FFFFFF"))
+            screen.blit(adv_text, (WIDTH + PADDING * 2 +
+                        INFO_PANEL_WIDTH - 50, white_captures_label_y))
+
+    def drawEvaluationBar(screen, gs):
+        """Draws a professional horizontal evaluation bar that updates dynamically."""
+        bar_x = WIDTH + PADDING * 2 + 20
+        bar_y = HEIGHT // 2 - 20
+        bar_width = INFO_PANEL_WIDTH - 40
+        bar_height = 20
+
+        # Draw border
+        p.draw.rect(screen, p.Color(ACCENT_COLOR), (bar_x, bar_y,
+                    bar_width, bar_height), 2, border_radius=5)
+
+        # Calculate score
+        material_score = calculateMaterialScore(gs)
+        max_score = 30  # Adjust if needed
+
+        # Normalize material score from -max_score...0...+max_score to 0...1
+        percent = (material_score + max_score) / (2 * max_score)
+        percent = max(0, min(1, percent))  # clamp
+
+        # White part width
+        white_width = int(bar_width * percent)
+        black_width = bar_width - white_width
+
+        # Draw white side
+        if white_width > 0:
+            p.draw.rect(screen, p.Color("#ECF0F1"), (bar_x, bar_y,
+                        white_width, bar_height), border_radius=5)
+
+        # Draw black side
+        if black_width > 0:
+            p.draw.rect(screen, p.Color("black"), (bar_x + white_width,
+                        bar_y, black_width, bar_height), border_radius=5)
 
     def calculateMaterialScore(gs):
-        """Calculate material score difference (positive = advantage for white)"""
+        """Calculate material score (positive = white advantage, negative = black advantage)"""
         score = 0
         piece_values = {'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9, 'k': 0}
 
@@ -334,6 +333,7 @@ def main():
                         score -= piece_values[piece_type]
 
         return score
+
     while running:
         mouse_pos = p.mouse.get_pos()
 
@@ -487,15 +487,17 @@ def main():
 
             result_surf = result_font.render(
                 game_result, True, p.Color(TEXT_COLOR))
+
+            # CENTER relative only to board
             result_rect = result_surf.get_rect(
-                center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2 - 20))
+                center=(PADDING + WIDTH // 2, PADDING + HEIGHT // 2 - 20))
             screen.blit(result_surf, result_rect)
 
-            # Add prompt to restart
+            # Add prompt text
             prompt_surf = button_font.render(
                 "Click 'New Game' to play again", True, p.Color(TEXT_COLOR))
             prompt_rect = prompt_surf.get_rect(
-                center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2 + 20))
+                center=(PADDING + WIDTH // 2, PADDING + HEIGHT // 2 + 20))
             screen.blit(prompt_surf, prompt_rect)
 
         p.display.flip()
