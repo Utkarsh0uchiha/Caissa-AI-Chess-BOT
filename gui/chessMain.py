@@ -1,10 +1,16 @@
 import pygame as p  # type: ignore
+import sys
+from pathlib import Path
+
+# Add the parent directory to the path so we can import engine
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from engine import chessEngine
 from engine import SmartMoveFinder
 
 p.init()
 p.display.set_caption("Caïssa Chess")
-icon = p.image.load("logo.png")
+icon = p.image.load("assets/logo.png")
 p.display.set_icon(icon)
 
 # Define colors for a cleaner aesthetic
