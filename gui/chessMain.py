@@ -1,6 +1,6 @@
 import pygame as p  # type: ignore
-import chessEngine
-import SmartMoveFinder
+from engine import chessEngine
+from engine import SmartMoveFinder
 
 p.init()
 p.display.set_caption("Caïssa Chess")
@@ -65,7 +65,7 @@ def loadImages():
               'Wp', 'Bk', 'Bq', 'Br', 'Bn', 'Bb', 'Bp']
     for piece in pieces:
         IMAGES[piece] = p.transform.scale(
-            p.image.load("pieces/" + piece + ".png"), (SQ_SIZE, SQ_SIZE)
+            p.image.load("assets/pieces/" + piece + ".png"), (SQ_SIZE, SQ_SIZE)
         )
 
 # Check if mouse is over a button
