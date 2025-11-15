@@ -107,7 +107,28 @@ python gui/chessMain.py
 ## 🖼️ Screenshot
 
 ### Interface:
-<p align="center"> <img src="screenshots/board.png" width="70%"> </p> <p align="center"> <img src="screenshots/screen2.png" width="70%"> </p>
+<p align="center"> <img src="screenshots/board.png" width="70%"> </p> <p align="center"> </p>
+
 ---
 
+## 🧩 Future Improvements
+  - Stronger evaluation function
+  - Opening book
+  - Transposition table
+  - Endgame tablebases
+  - Zobrist hashing
+  - PGN/FEN import & export
+  - Online multiplayer support
 
+---
+## 🤝 Contributing
+  - Pull requests are welcome! Just make sure your code is clean and modular.
+---
+
+## 📜 License
+ - This project is licensed under the MIT License. You are free to use, modify, and distribute.
+
+---
+
+## ⭐ Support the Project
+  - If you like Caïssa, please star ⭐ the repo — it motivates development!
